@@ -23,12 +23,14 @@ import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.DynamicMessage;
 import io.ballerina.runtime.api.TypeTags;
 import io.ballerina.runtime.api.creators.ValueCreator;
+import io.ballerina.runtime.api.types.TableType;
 import io.ballerina.runtime.api.types.Type;
 import io.ballerina.runtime.api.values.BArray;
 import io.ballerina.runtime.api.values.BError;
 import io.ballerina.runtime.api.values.BMap;
 import io.ballerina.runtime.api.values.BObject;
 import io.ballerina.runtime.api.values.BString;
+import io.ballerina.runtime.api.values.BTable;
 import io.ballerina.runtime.api.values.BTypedesc;
 
 import java.util.Locale;
@@ -108,6 +110,10 @@ public class Serializer {
             return  newMessageFromSchema.build();
         } else if (type.getTag() == TypeTags.RECORD_TYPE_TAG) {
             return generateDynamicMessageForBallerinaRecord((BMap<BString, Object>) dataObject, schema);
+        } else if (type.getTag() == TypeTags.TABLE_TAG) {
+            TableType tableType = (TableType) type;
+            String fieldType = tableType.getConstrainedType().getName();
+            return generateDynamicMessageForTable(dataObject, schema, fieldType, ATOMIC_FIELD_NAME);
         } else {
             throw createSerdesError(UNSUPPORTED_DATA_TYPE + type.getName(), SERDES_ERROR);
         }
@@ -268,5 +274,22 @@ public class Serializer {
             newMessageFromSchema.setField(field, dynamicMessage);
         }
         return  newMessageFromSchema.build();
+    }
+
+    private static DynamicMessage generateDynamicMessageForTable(Object value, Descriptor schema, String fieldType,
+                                                                 String fieldName) {
+        DynamicMessage.Builder newMessageFromSchema = DynamicMessage.newBuilder(schema);
+        Descriptor messageDescriptor = newMessageFromSchema.getDescriptorForType();
+        FieldDescriptor fieldDescriptor = messageDescriptor.findFieldByName(fieldName);
+        Descriptor tableSchema = schema.findNestedTypeByName(fieldType);
+        BTable bTable = (BTable) value;
+        Object[] objectList = bTable.values().toArray();
+
+        for (Object object : objectList) {
+            BMap<BString, Object> objToBMap = (BMap<BString, Object>) object;
+            DynamicMessage nestedMessage = generateDynamicMessageForBallerinaRecord(objToBMap, tableSchema);
+            newMessageFromSchema.addRepeatedField(fieldDescriptor, nestedMessage);
+        }
+        return newMessageFromSchema.build();
     }
 }

@@ -23,6 +23,7 @@ import io.ballerina.runtime.api.TypeTags;
 import io.ballerina.runtime.api.types.ArrayType;
 import io.ballerina.runtime.api.types.Field;
 import io.ballerina.runtime.api.types.RecordType;
+import io.ballerina.runtime.api.types.TableType;
 import io.ballerina.runtime.api.types.Type;
 import io.ballerina.runtime.api.types.UnionType;
 import io.ballerina.runtime.api.values.BError;
@@ -109,6 +110,13 @@ public class SchemaGenerator {
         } else if (type.getTag() == TypeTags.RECORD_TYPE_TAG) {
             RecordType recordType = (RecordType) type;
             return buildProtobufMessageForBallerinaRecordType(recordType.getFields(), type.getName());
+        } else if (type.getTag() == TypeTags.TABLE_TAG) {
+            TableType tableType = (TableType) type;
+            ProtobufMessage protobufMessage = buildProtobufMessageForTable(type);;
+            ProtobufMessageBuilder messageBuilder = ProtobufMessage.newMessageBuilder("TableBuilder");
+            messageBuilder.addNestedMessage(protobufMessage);
+            messageBuilder.addField(REPEATED_LABEL, tableType.getConstrainedType().getName(), ATOMIC_FIELD_NAME, 1);
+            return messageBuilder.build();
         } else {
             throw createSerdesError(UNSUPPORTED_DATA_TYPE + type.getName(), SERDES_ERROR);
         }
@@ -235,5 +243,17 @@ public class SchemaGenerator {
             }
         }
         return messageBuilder.build();
+    }
+
+    private static ProtobufMessage buildProtobufMessageForTable(Type type) {
+        TableType tableType = (TableType) type;
+
+        if (tableType.getConstrainedType().getTag() == TypeTags.RECORD_TYPE_TAG) {
+            RecordType recordType = (RecordType) tableType.getConstrainedType();
+            String recordTypeName = tableType.getConstrainedType().getName();
+            return buildProtobufMessageForBallerinaRecordType(recordType.getFields(), recordTypeName);
+        } else {
+            throw createSerdesError(UNSUPPORTED_DATA_TYPE + "Member type required", SERDES_ERROR);
+        }
     }
 }

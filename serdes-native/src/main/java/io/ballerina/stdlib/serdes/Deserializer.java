@@ -29,6 +29,7 @@ import io.ballerina.runtime.api.creators.ValueCreator;
 import io.ballerina.runtime.api.types.ArrayType;
 import io.ballerina.runtime.api.types.Field;
 import io.ballerina.runtime.api.types.RecordType;
+import io.ballerina.runtime.api.types.TableType;
 import io.ballerina.runtime.api.types.Type;
 import io.ballerina.runtime.api.types.UnionType;
 import io.ballerina.runtime.api.utils.StringUtils;
@@ -37,6 +38,7 @@ import io.ballerina.runtime.api.values.BError;
 import io.ballerina.runtime.api.values.BMap;
 import io.ballerina.runtime.api.values.BObject;
 import io.ballerina.runtime.api.values.BString;
+import io.ballerina.runtime.api.values.BTable;
 import io.ballerina.runtime.api.values.BTypedesc;
 
 import java.util.Collection;
@@ -114,6 +116,8 @@ public class Deserializer {
         } else if (type.getTag() == TypeTags.RECORD_TYPE_TAG) {
             Map<String, Object> mapObject = getBallerinaRecordValueFromMessage(dynamicMessage, type, schema);
             return ValueCreator.createRecordValue(type.getPackage(), type.getName(), mapObject);
+        } else if (type.getTag() == TypeTags.TABLE_TAG) {
+            return tableToBallerina(dynamicMessage, type, schema, ATOMIC_FIELD_NAME);
         } else {
             throw createSerdesError(UNSUPPORTED_DATA_TYPE + type.getName(), SERDES_ERROR);
         }
@@ -297,5 +301,23 @@ public class Deserializer {
             }
         }
         throw createSerdesError(DESERIALIZATION_ERROR_MESSAGE + UNSUPPORTED_UNION_TYPE, SERDES_ERROR);
+    }
+
+    private static Object tableToBallerina(DynamicMessage dynamicMessage, Type type, Descriptor schema,
+                                           String fieldName) {
+        TableType tableType = (TableType) type;
+        Type elementType = tableType.getConstrainedType();
+        BTable bTable = ValueCreator.createTableValue(tableType);
+        FieldDescriptor fieldDescriptor = schema.findFieldByName(fieldName);
+        Object tableData = dynamicMessage.getField(fieldDescriptor);
+        Descriptor nestedSchema = schema.findNestedTypeByName(elementType.getName());
+        Collection table = (Collection) tableData;
+
+        for (Object tableRow : table) {
+            DynamicMessage nestedRecord = (DynamicMessage) tableRow;
+            Map<String, Object> mapObject = getBallerinaRecordValueFromMessage(nestedRecord, elementType, nestedSchema);
+            bTable.add(ValueCreator.createRecordValue(elementType.getPackage(), elementType.getName(), mapObject));
+        }
+        return bTable;
     }
 }

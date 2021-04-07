@@ -500,3 +500,27 @@ public isolated function simpleTest() returns error? {
     President decoded = <President>check des.deserialize(encoded);
     test:assertEquals(decoded, p);
 }
+
+type EmployeeRow record {
+    readonly int id;
+    string name;
+    float salary;
+};
+
+type EmployeeTable table<EmployeeRow> key(id);
+
+@test:Config{}
+public isolated function testTable() returns error? {
+    EmployeeTable employeeTab = table [
+      {id: 1, name: "John", salary: 300.50},
+      {id: 2, name: "Bella", salary: 500.50},
+      {id: 3, name: "Peter", salary: 750.0}
+    ];
+
+    Proto3SerDes ser = check new(EmployeeTable);
+    byte[] encoded = check ser.serialize(employeeTab);
+
+    Proto3SerDes des = check new(EmployeeTable);
+    EmployeeTable decoded = <EmployeeTable>check des.deserialize(encoded);
+    test:assertEquals(decoded, employeeTab);
+}

@@ -16,13 +16,17 @@
 
 import ballerina/test;
 
-type EmployeeTable table<map<any>>;
+enum Language {
+    EN = "English",
+    TA = "Tamil",
+    SI = "Sinhala"
+}
 
 @test:Config{}
 public isolated function testUnsupportedDataType() returns error? {
-    string expected = "Unsupported data type: table";
+    string expected = "Unsupported data type: ballerina/serdes:0.1.0-alpha7:Language";
 
-    Proto3SerDes|error ser = new(EmployeeTable);
+    Proto3SerDes|error ser = new(Language);
     test:assertTrue(ser is Error);
     Error err = <Error> ser;
     test:assertEquals(err.message(), expected);
