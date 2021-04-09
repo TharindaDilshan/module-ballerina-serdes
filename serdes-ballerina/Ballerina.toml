@@ -1,5 +1,5 @@
 [package]
-org = "ballerina"
+org = "tharindad"
 name = "serdes"
 version = "@toml.version@"
 
